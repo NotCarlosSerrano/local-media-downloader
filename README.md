@@ -8,10 +8,11 @@ Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.
 
 - **Audio**: MP3, M4A or Opus, 128–320 kbps
 - **Video**: MP4 from 360p up to 1080p / best available
-- **Playlists**: download a whole playlist as a ZIP
+- **Playlists**: download a playlist (up to 50 items) as a ZIP
 - **Trim**: download only a section (e.g. `1:20` → `3:45`)
 - **Preview**: title, channel, duration and thumbnail before downloading
-- **Live progress**: percentage, speed, time remaining and current stage; cancel anytime
+- **Live progress**: percentage, speed and time remaining for both download and conversion; cancel anytime
+- **Watchdog**: a stalled conversion is stopped with a clear error instead of hanging
 - **Local only**: the server listens on `127.0.0.1`; nothing is exposed to your network
 
 ## Requirements
@@ -30,23 +31,22 @@ pip install -r requirements.txt
 python server.py
 ```
 
-Then open <http://localhost:8000>.
-
-## Other ways to use it
-
-```bash
-python downloader.py                       # small desktop window (tkinter)
-python downloader.py URL [URL ...]         # command line, MP3 to ~/Music/YouTube MP3
-python downloader.py URL -o out -q 320     # custom folder and bitrate
-```
+Then open <http://localhost:8000>. Use `--port 9000` (or `PORT=9000`) to change the port and `--no-browser` to skip opening the browser.
 
 ## How it works
 
 ```
-browser ──/start──▶ server.py ──▶ yt-dlp + ffmpeg (background thread)
-        ◀─/status─ (polled every 500 ms for progress)
-        ◀─/file─── finished file, then temp files are deleted
+browser ──/info───▶ server.py   preview (no download)
+        ──/start──▶ server.py ──▶ yt-dlp downloads, ffmpeg converts (background thread)
+        ◀─/status─  polled every 500 ms for progress
+        ──/cancel─▶ stops the job and deletes temp files
+        ◀─/file───  finished file, then temp files are deleted
 ```
+
+- `server.py` — local web server and job queue
+- `downloader.py` — download engine (yt-dlp + ffmpeg)
+- `index.html` — the web interface
+- `run.bat` — Windows launcher
 
 Unclaimed jobs and their temp files expire after 15 minutes.
 
