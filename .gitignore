@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Descargas y temporales
+downloads/
+*.mp3
+*.mp4
+*.m4a
+*.opus
+*.webm
+*.part
+*.ytdl
+*.zip
+
+# Editores y sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code (configuración local)
+.claude/settings.local.json
