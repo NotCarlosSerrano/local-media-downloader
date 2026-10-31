@@ -225,6 +225,56 @@
   #histList .m { grid-column: 1; font-size: .8125rem; color: var(--ink-2); }
   #histList .link-btn { grid-column: 2; grid-row: 1 / span 2; }
 
+  /* Varios videos */
+  fieldset.mode { margin: 0 0 22px; }
+  textarea {
+    display: block; width: 100%; min-height: 110px; resize: vertical;
+    font: inherit; color: var(--ink); padding: 12px 14px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg);
+  }
+  textarea::placeholder { color: var(--ink-2); opacity: .75; }
+  textarea:focus-visible { outline-offset: 0; }
+  .row-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  .row-actions .btn-ghost { padding: 10px 14px; }
+
+  .stage { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .stage-tools { display: flex; gap: 4px; flex-wrap: wrap; }
+  .stage-cols, .stage-list li {
+    display: grid; grid-template-columns: 22px minmax(0, 1fr) 84px 84px 34px; gap: 2px 8px; align-items: center;
+  }
+  .stage-cols { margin-top: 10px; font-size: .75rem; color: var(--ink-2); font-weight: 600; }
+  .stage-cols span:first-child { grid-column: 2; }
+  .stage-list, .queue-list { list-style: none; margin: 6px 0 0; padding: 0; }
+  .stage-list { max-height: 60vh; overflow-y: auto; }
+  .stage-list li { padding: 8px 0; border-top: 1px solid var(--line); }
+  .stage-list li.off .t, .stage-list li.off .m { opacity: .5; }
+  .stage-list input[type="checkbox"] { grid-column: 1; grid-row: 1 / span 2; width: 18px; height: 18px; margin: 0; accent-color: var(--signal); }
+  .stage-list .t, .stage-list .m { grid-column: 2; }
+  .stage-list .ts, .stage-list .te, .stage-list .x { grid-row: 1 / span 2; }
+  .stage-list .ts { grid-column: 3; } .stage-list .te { grid-column: 4; } .stage-list .x { grid-column: 5; }
+  .stage-list input[type="text"] { width: 100%; padding: 7px 9px; font-size: .9375rem; }
+  .stage-list .t, .queue-list .t { font-weight: 500; font-size: .9375rem; line-height: 1.35; overflow-wrap: anywhere; }
+  .stage-list .m, .queue-list .m { font-size: .8125rem; color: var(--ink-2); overflow-wrap: anywhere; }
+  .x {
+    width: 34px; height: 34px; padding: 0; border: 1px solid transparent; background: none;
+    color: var(--ink-2); font-size: 1.25rem; line-height: 1;
+  }
+  .x:hover { border-color: var(--line); color: var(--ink); }
+
+  .queue-list li {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center;
+    padding: 10px 0; border-top: 1px solid var(--line);
+  }
+  .queue-list .t, .queue-list .m, .queue-list .bar { grid-column: 1; }
+  .queue-list .acts { grid-column: 2; grid-row: 1 / span 4; display: flex; flex-direction: column; align-items: flex-end; }
+  .queue-list li.st-error .s { color: var(--err); }
+  .queue-list li.st-done .s::before { content: "✓ "; color: var(--signal); font-weight: 700; }
+  .bar { height: 6px; margin-top: 4px; border-radius: 3px; background: var(--seg-off); overflow: hidden; }
+  .bar span { display: block; height: 100%; width: var(--p, 0%); background: var(--signal); transition: width .3s; }
+  .bar.busy span { width: 30%; animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+  .head-tools { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+
   footer { margin-top: 28px; font-size: .8125rem; color: var(--ink-2); max-width: 60ch; }
 
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -236,6 +286,12 @@
     .preview img { width: 88px; }
     .readout { gap: 14px; }
     .pct { font-size: 2.1rem; }
+    .stage-cols { display: none; }
+    .stage-list li { grid-template-columns: 22px 1fr 1fr 34px; }
+    .stage-list .t, .stage-list .m { grid-column: 2 / -1; }
+    .stage-list input[type="checkbox"] { grid-row: 1; }
+    .stage-list .ts, .stage-list .te, .stage-list .x { grid-row: 3; }
+    .stage-list .ts { grid-column: 2; } .stage-list .te { grid-column: 3; } .stage-list .x { grid-column: 4; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition: none !important; animation: none !important; }
@@ -253,6 +309,27 @@
 
   <main>
     <form id="f" class="panel" novalidate>
+      <fieldset class="mode" id="modeSet" hidden>
+        <legend class="sr">Modo</legend>
+        <div class="q-grid cols-2">
+          <input type="radio" name="mode" id="mOne" value="one" checked><label for="mOne"><b>Un video</b><span>Lo guarda el navegador</span></label>
+          <input type="radio" name="mode" id="mMany" value="many"><label for="mMany"><b>Varios o una lista</b><span>Cola, recorte por video</span></label>
+        </div>
+      </fieldset>
+
+      <div id="manyIn" hidden>
+        <label class="field" for="urls">Enlaces de videos o de listas</label>
+        <textarea id="urls" rows="4" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="manyHint"
+                  placeholder="Uno por línea:&#10;https://www.youtube.com/watch?v=…&#10;https://www.youtube.com/playlist?list=…"></textarea>
+        <label class="check">
+          <input type="checkbox" id="expandLists" checked>
+          <span>Si un enlace pertenece a una lista, cargar todos los videos de la lista</span>
+        </label>
+        <div class="row-actions"><button type="button" class="btn-ghost" id="loadMany">Cargar videos</button></div>
+        <p id="manyHint" class="hint">Pega uno o varios enlaces y pulsa Cargar videos. Después eliges cuáles descargar y el inicio y el fin de cada uno.</p>
+      </div>
+
+      <div id="oneIn">
       <label class="field" for="url">Enlace del video o de la lista</label>
       <div class="url-row">
         <input id="url" type="text" inputmode="url" autocomplete="off" spellcheck="false" autocapitalize="off"
@@ -263,7 +340,7 @@
 
       <label class="check" id="plWrap" hidden>
         <input type="checkbox" id="plAll">
-        <span>Descargar la lista completa (hasta 50 elementos) en lugar de solo este video</span>
+        <span>Descargar la lista completa en un ZIP en lugar de solo este video</span>
       </label>
 
       <div id="preview" class="preview" hidden>
@@ -272,6 +349,7 @@
           <p class="pt" id="pvTitle"></p>
           <p class="pm" id="pvMeta"></p>
         </div>
+      </div>
       </div>
 
       <fieldset>
@@ -315,6 +393,20 @@
           </div>
         </fieldset>
         <p class="hint">Si el video no llega a esa resolución, se usa la más alta disponible.</p>
+      </div>
+
+      <div id="stage" class="stage" hidden>
+        <div class="hist-head">
+          <p class="legend" id="stageTitle">Videos por añadir</p>
+          <div class="stage-tools">
+            <button type="button" class="link-btn" id="selAll">Marcar todos</button>
+            <button type="button" class="link-btn" id="selNone">Ninguno</button>
+            <button type="button" class="link-btn" id="stageClear">Vaciar</button>
+          </div>
+        </div>
+        <div class="stage-cols" aria-hidden="true"><span>Video</span><span>Inicio</span><span>Fin</span></div>
+        <ul id="stageList" class="stage-list"></ul>
+        <p id="stageHint" class="hint">Solo se añaden los marcados. Tiempos en m:ss, h:mm:ss o segundos; vacío es desde el principio o hasta el final.</p>
       </div>
 
       <details class="trim" id="trim">
@@ -382,6 +474,18 @@
       </div>
     </section>
 
+    <section id="queue" class="panel" hidden aria-labelledby="queueTitle">
+      <div class="hist-head">
+        <h2 id="queueTitle" tabindex="-1" style="margin:0;font-size:1rem">Cola de descargas</h2>
+        <div class="head-tools">
+          <button type="button" class="link-btn" id="openDir">Abrir carpeta</button>
+          <button type="button" class="link-btn" id="clearDone">Quitar terminados</button>
+        </div>
+      </div>
+      <p id="queueSub" class="job-sub"></p>
+      <ul id="queueList" class="queue-list"></ul>
+    </section>
+
     <section id="hist" class="panel" hidden aria-labelledby="histTitle">
       <div class="hist-head">
         <h2 id="histTitle">Convertidos en esta sesión</h2>
@@ -391,7 +495,7 @@
     </section>
   </main>
 
-  <footer>Los archivos se guardan en tu carpeta de descargas. El servidor borra su copia temporal en cuanto entrega el archivo. Las listas se entregan en un ZIP con un máximo de 50 elementos.</footer>
+  <footer>En el modo de un video, el navegador guarda el archivo en tu carpeta de descargas. La cola guarda cada archivo directamente en la carpeta que indica y sigue trabajando aunque cierres esta pestaña, mientras server.py esté abierto. El servidor borra sus copias temporales al terminar.</footer>
 </div>
 
 <script>
@@ -483,12 +587,27 @@
   }
 
   const trimHint = $('trimHint'), TRIM_HINT = trimHint.textContent;
+  let staged = []; // videos cargados en el modo de varios, antes de mandarlos a la cola
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   function updateForm() {
     const o = getOpts();
-    const r = checkUrl($('url').value);
-    const pl = isPlaylist(r);
+    const many = radio('mode') === 'many';
     $('audioOpts').hidden = o.kind !== 'audio';
     $('videoOpts').hidden = o.kind !== 'video';
+    $('oneIn').hidden = $('trim').hidden = many;
+    $('manyIn').hidden = !many;
+    $('stage').hidden = !many || !staged.length;
+    if (many) {
+      const on = staged.filter(s => s.chk.checked).length;
+      $('stageTitle').textContent = on === staged.length ? plural(staged.length, 'video', 'videos')
+                                                         : `${on} de ${staged.length} videos marcados`;
+      const label = o.kind === 'video' ? 'MP4' : FMT_LABEL[o.fmt];
+      $('go').textContent = !staged.length ? 'Cargar videos'
+        : on ? `Añadir ${plural(on, 'video', 'videos')} a la cola (${label})` : 'Marca al menos un video';
+      return;
+    }
+    const r = checkUrl($('url').value);
+    const pl = isPlaylist(r);
     $('plWrap').hidden = !(r && !r.error && r.hasList && !r.listOnly);
     $('tStart').disabled = $('tEnd').disabled = pl;
     if (pl) setTrimHint('El recorte no está disponible para listas.', false);
@@ -591,7 +710,7 @@
   $('histList').addEventListener('click', e => {
     const b = e.target.closest('button[data-i]'); if (!b) return;
     const h = history[+b.dataset.i]; if (!h) return;
-    showForm(); $('url').value = h.url;
+    showForm(); setRadio('mode', 'one'); $('url').value = h.url;
     setRadio('kind', h.kind || 'audio'); setRadio('fmt', h.fmt || 'mp3'); setRadio('q', h.q || '192'); setRadio('res', h.res || '720');
     $('plAll').checked = !!h.playlist;
     clearHint(); updateForm(); schedulePreview(0); $('url').focus();
@@ -811,8 +930,226 @@
     }
   }
 
+  /* ---------- Varios videos: cargar, elegir y recortar ---------- */
+  const manyHint = $('manyHint'), MANY_HINT = manyHint.textContent;
+  const stageHint = $('stageHint'), STAGE_HINT = stageHint.textContent;
+  const setMsg = (el, msg, err) => { el.textContent = msg; el.classList.toggle('err', !!err); };
+  const make = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+  function addStaged(v) {
+    const title = v.title || v.url;
+    const li = make('li');
+    const chk = make('input'); chk.type = 'checkbox'; chk.checked = true;
+    chk.setAttribute('aria-label', `Descargar ${title}`);
+    const t = make('span', 't', title);
+    const m = make('span', 'm', [v.index ? `#${v.index}` : null, v.duration ? fmtTime(v.duration) : 'Duración desconocida', v.from].filter(Boolean).join(' · '));
+    const time = (cls, ph, what) => {
+      const i = make('input', cls); i.type = 'text'; i.inputMode = 'decimal'; i.autocomplete = 'off'; i.spellcheck = false;
+      i.placeholder = ph; i.setAttribute('aria-label', `${what} de ${title}`);
+      i.addEventListener('input', () => { i.removeAttribute('aria-invalid'); if (stageHint.classList.contains('err')) setMsg(stageHint, STAGE_HINT, false); });
+      return i;
+    };
+    const ts = time('ts', '0:00', 'Inicio');
+    const te = time('te', v.duration ? fmtTime(v.duration) : 'Final', 'Fin');
+    const x = make('button', 'x', '×'); x.type = 'button'; x.setAttribute('aria-label', `Quitar ${title}`);
+    const row = { url: v.url, title, duration: v.duration || null, li, chk, ts, te };
+    chk.addEventListener('change', () => { li.classList.toggle('off', !chk.checked); updateForm(); });
+    x.addEventListener('click', () => {
+      const k = staged.indexOf(row);
+      staged.splice(k, 1); li.remove(); updateForm();
+      const next = staged[k] || staged[k - 1];
+      (next ? next.li.querySelector('.x') : $('urls')).focus();
+    });
+    li.append(chk, t, m, ts, te, x);
+    staged.push(row); $('stageList').append(li);
+  }
+  function clearStaged() { staged = []; $('stageList').replaceChildren(); updateForm(); }
+
+  async function loadMany() {
+    const lines = $('urls').value.split(/\s+/).filter(Boolean);
+    if (!lines.length) { setMsg(manyHint, 'Pega al menos un enlace de YouTube.', true); $('urls').focus(); return; }
+    const expand = $('expandLists').checked;
+    const jobs = lines.map(line => ({ line, r: checkUrl(line) }));
+    const results = new Array(jobs.length);
+    let next = 0, done = 0;
+    $('loadMany').disabled = $('go').disabled = true;
+    setMsg(manyHint, `Cargando 0 de ${jobs.length}…`, false);
+    const worker = async () => {
+      while (next < jobs.length) {
+        const k = next++, { r } = jobs[k];
+        if (r.error) results[k] = { error: r.error };
+        else {
+          const pl = r.listOnly || (r.hasList && expand);
+          try { results[k] = { r, pl, d: await getJson('/info?' + new URLSearchParams({ url: r.url, playlist: pl ? '1' : '0' })) }; }
+          catch (err) { results[k] = { r, pl, error: err.message }; }
+        }
+        setMsg(manyHint, `Cargando ${++done} de ${jobs.length}…`, false);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    const failed = []; let added = 0;
+    results.forEach((x, k) => {
+      if (x.d && x.d.is_playlist) {
+        for (const e of x.d.entries || []) {
+          const url = e.url || (e.id ? `https://www.youtube.com/watch?v=${e.id}` : null);
+          if (url) { addStaged({ url, title: e.title, duration: e.duration, index: e.index, from: x.d.title }); added++; }
+        }
+      } else if (x.d) { addStaged({ url: x.r.url, title: x.d.title, duration: x.d.duration }); added++; }
+      else if (x.r && !x.pl) { addStaged({ url: x.r.url, title: x.r.url, from: 'Sin vista previa' }); added++; }
+      else failed.push(jobs[k].line);
+    });
+    $('urls').value = failed.join('\n');
+    let msg = `${plural(added, 'video cargado', 'videos cargados')}.`;
+    if (failed.length) msg += ` ${plural(failed.length, 'enlace no se pudo cargar y sigue', 'enlaces no se pudieron cargar y siguen')} en el cuadro.`;
+    setMsg(manyHint, msg, !added);
+    $('loadMany').disabled = $('go').disabled = false;
+    updateForm();
+    if (added) staged[staged.length - added].chk.focus(); else $('urls').focus();
+  }
+
+  async function submitMany() {
+    if (!staged.length) { loadMany(); return; }
+    const items = []; let bad = null;
+    for (const row of staged) {
+      if (!row.chk.checked) continue;
+      const s = parseTime(row.ts.value), e = parseTime(row.te.value);
+      let msg = null, el = row.te;
+      if (Number.isNaN(s)) { msg = 'el inicio no es válido'; el = row.ts; }
+      else if (Number.isNaN(e)) msg = 'el fin no es válido';
+      else if (e != null && e <= 0) msg = 'el fin debe ser mayor que 0';
+      else if (s != null && e != null && e <= s) msg = 'el fin debe ser posterior al inicio';
+      else if (row.duration && s != null && s >= row.duration) { msg = `el inicio supera la duración (${fmtTime(row.duration)})`; el = row.ts; }
+      if (msg) { el.setAttribute('aria-invalid', 'true'); bad = bad || { el, msg: `${row.title}: ${msg}.` }; continue; }
+      items.push({ url: row.url, title: row.title, duration: row.duration, start: s || null, end: e });
+    }
+    if (bad) { setMsg(stageHint, bad.msg, true); bad.el.focus(); return; }
+    if (!items.length) { setMsg(stageHint, 'Marca al menos un video para añadirlo a la cola.', true); return; }
+    const o = getOpts();
+    $('go').disabled = true;
+    try {
+      const r = await fetch('/queue/add', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: o.kind, fmt: o.fmt, q: o.q, res: o.res, items }),
+      });
+      let data = {};
+      try { data = await r.json(); } catch { /* sin JSON */ }
+      if (!r.ok || data.error) throw new Error(data.error || `El servidor local respondió con un error (${r.status}).`);
+      staged = staged.filter(row => !row.chk.checked);
+      $('stageList').replaceChildren(...staged.map(row => row.li));
+      setMsg(stageHint, STAGE_HINT, false);
+      setMsg(manyHint, `${plural(data.added, 'video añadido', 'videos añadidos')} a la cola. Puedes cerrar esta pestaña: la cola sigue mientras server.py esté abierto.`, false);
+      pollQueue();
+    } catch (err) {
+      setMsg(stageHint, 'No se pudo añadir a la cola: ' + (err instanceof TypeError ? 'no hay conexión con el servidor local.' : err.message), true);
+    } finally {
+      $('go').disabled = false; updateForm();
+    }
+  }
+
+  $('loadMany').addEventListener('click', loadMany);
+  $('urls').addEventListener('input', () => { if (manyHint.classList.contains('err')) setMsg(manyHint, MANY_HINT, false); });
+  $('urls').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); loadMany(); } });
+  const markAll = on => { staged.forEach(s => { s.chk.checked = on; s.li.classList.toggle('off', !on); }); updateForm(); };
+  $('selAll').addEventListener('click', () => markAll(true));
+  $('selNone').addEventListener('click', () => markAll(false));
+  $('stageClear').addEventListener('click', () => { clearStaged(); setMsg(stageHint, STAGE_HINT, false); $('urls').focus(); });
+
+  /* ---------- Cola (en el servidor) ---------- */
+  const RUN_ST = ['starting', 'downloading', 'converting'];
+  const qRows = new Map();
+  let qTimer = null, queueOn = false;
+
+  async function pollQueue() {
+    clearTimeout(qTimer);
+    let data;
+    try { data = await getJson('/queue'); }
+    catch {
+      if (!queueOn) return; // servidor sin cola (versión anterior): se queda el modo de un video
+      $('queueSub').textContent = 'Sin conexión con el servidor local. Reintentando…';
+      qTimer = setTimeout(pollQueue, 5000);
+      return;
+    }
+    queueOn = true; $('modeSet').hidden = false;
+    renderQueue(data);
+    const busy = data.items.some(i => i.stage === 'queued' || RUN_ST.includes(i.stage));
+    qTimer = setTimeout(pollQueue, busy ? 1000 : 5000);
+  }
+
+  function queueAct(path, id) {
+    return getJson(`/queue/${path}` + (id ? '?id=' + encodeURIComponent(id) : ''))
+      .catch(err => { $('queueSub').textContent = 'No se pudo: ' + err.message; })
+      .then(pollQueue);
+  }
+
+  function makeQRow(id) {
+    const li = make('li');
+    const row = { li, t: make('span', 't'), m: make('span', 'm'), s: make('span', 'm s'), bar: make('div', 'bar'),
+                  retry: make('button', 'link-btn', 'Reintentar'), rm: make('button', 'link-btn') };
+    row.bar.append(make('span'));
+    row.retry.type = row.rm.type = 'button';
+    row.retry.addEventListener('click', () => queueAct('retry', id));
+    row.rm.addEventListener('click', () => {
+      if (li.contains(document.activeElement)) $('queueTitle').focus();
+      queueAct('remove', id);
+    });
+    const acts = make('div', 'acts'); acts.append(row.rm, row.retry);
+    li.append(row.t, row.m, row.s, row.bar, acts);
+    return row;
+  }
+
+  function updateQRow(row, it) {
+    const title = it.title || it.url, running = RUN_ST.includes(it.stage);
+    row.li.className = 'st-' + it.stage;
+    row.t.textContent = title;
+    row.m.textContent = describe({ kind: it.kind, fmt: it.fmt, q: it.quality, res: it.res, start: it.start, end: it.end });
+    let st;
+    if (it.stage === 'queued') st = 'En cola';
+    else if (it.stage === 'done') st = it.filename + (it.size ? ` (${fmtMB(it.size)})` : '');
+    else if (it.stage === 'error') st = 'Error: ' + (it.message || 'falló la descarga');
+    else if (it.stage === 'cancelled') st = 'Cancelado';
+    else {
+      const sp = fmtSpeed(it.speed);
+      st = [it.message, it.percent != null ? Math.floor(it.percent) + ' %' : null, sp !== '—' ? sp : null,
+            it.percent != null && it.eta != null ? 'quedan ' + fmtTime(it.eta) : null].filter(Boolean).join(' · ');
+    }
+    row.s.textContent = st;
+    row.bar.hidden = !running;
+    row.bar.classList.toggle('busy', running && it.percent == null);
+    row.bar.style.setProperty('--p', (it.percent || 0) + '%');
+    row.retry.hidden = !(it.stage === 'error' || it.stage === 'cancelled');
+    row.rm.textContent = running ? 'Cancelar' : 'Quitar';
+    row.rm.setAttribute('aria-label', `${row.rm.textContent} ${title}`);
+    row.retry.setAttribute('aria-label', `Reintentar ${title}`);
+  }
+
+  function renderQueue(data) {
+    const items = data.items || [], list = $('queueList');
+    $('queue').hidden = !items.length;
+    const count = st => items.filter(i => st.includes(i.stage)).length;
+    const parts = [];
+    if (count(RUN_ST)) parts.push('Descargando');
+    if (count(['queued'])) parts.push(plural(count(['queued']), 'pendiente', 'pendientes'));
+    if (count(['done'])) parts.push(plural(count(['done']), 'listo', 'listos'));
+    if (count(['error'])) parts.push(plural(count(['error']), 'con error', 'con error'));
+    $('queueSub').textContent = `${parts.join(' · ') || 'Vacía'}. Se guardan en ${data.out_dir}`;
+    const seen = new Set();
+    items.forEach((it, k) => {
+      let row = qRows.get(it.id);
+      if (!row) { row = makeQRow(it.id); qRows.set(it.id, row); }
+      seen.add(it.id);
+      updateQRow(row, it);
+      if (list.children[k] !== row.li) list.insertBefore(row.li, list.children[k] || null);
+    });
+    for (const [id, row] of qRows) if (!seen.has(id)) { row.li.remove(); qRows.delete(id); }
+    $('clearDone').hidden = !count(['done', 'error', 'cancelled']);
+  }
+
+  $('openDir').addEventListener('click', () => queueAct('open'));
+  $('clearDone').addEventListener('click', () => queueAct('clear'));
+
   $('f').addEventListener('submit', e => {
     e.preventDefault();
+    if (radio('mode') === 'many') { submitMany(); return; }
     const r = checkUrl($('url').value);
     if (r.error) { setHintError(r.error); $('url').focus(); return; }
     clearHint();
@@ -830,6 +1167,9 @@
   $('url').addEventListener('blur', () => { const r = checkUrl($('url').value); if (!r.error) schedulePreview(0); });
   $('plAll').addEventListener('change', () => { updateForm(); schedulePreview(0); });
   document.querySelectorAll('input[name="kind"], input[name="fmt"]').forEach(el => el.addEventListener('change', updateForm));
+  document.querySelectorAll('input[name="mode"]').forEach(el => el.addEventListener('change', () => {
+    updateForm(); (radio('mode') === 'many' ? $('urls') : $('url')).focus();
+  }));
   ['tStart', 'tEnd'].forEach(id => $(id).addEventListener('input', () => { if (trimHint.classList.contains('err')) setTrimHint(TRIM_HINT, false); }));
 
   $('paste').addEventListener('click', async () => {
@@ -855,6 +1195,7 @@
   $('jobTitle').tabIndex = -1;
   updateForm();
   renderHist();
+  pollQueue();
 })();
 </script>
 </body>

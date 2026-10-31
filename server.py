@@ -8,6 +8,8 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -34,6 +36,19 @@ CTYPES = {".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".opus": "audio/ogg",
 STATUS_FIELDS = ("stage", "message", "title", "percent", "speed", "eta",
                  "kind", "format", "res", "playlist", "item_index", "item_count", "item_title",
                  "skipped", "filename", "size", "start", "end")
+
+# Cola: varios videos, uno tras otro, guardados directamente en la carpeta de descargas
+OUT_DIR = Path.home() / "Downloads"
+QUEUE_FILE = Path(__file__).with_name("queue.json")
+QUEUE = []
+QUEUE_LOCK = threading.Lock()
+SAVE_LOCK = threading.Lock()
+QUEUE_WAKE = threading.Event()
+QUEUE_SAVED = ("id", "url", "title", "duration", "kind", "fmt", "quality", "res", "start", "end",
+               "stage", "message", "filename", "size", "added")
+QUEUE_FIELDS = QUEUE_SAVED + ("percent", "speed", "eta")
+RUNNING = ("starting", "downloading", "converting")
+MAX_BODY = 8 * 1024 * 1024
 
 
 class BadRequest(ValueError):
@@ -70,9 +85,7 @@ def is_playlist_url(url, flag):
     return u.path.rstrip("/") == "/playlist" and has_list
 
 
-def parse_start(arg):
-    url = arg("url")
-    check_url(url)
+def parse_options(arg):
     kind = arg("type", "audio")
     if kind not in ("audio", "video"):
         raise BadRequest("type debe ser audio o video")
@@ -85,21 +98,64 @@ def parse_start(arg):
     res = arg("res", "720")
     if res not in RESOLUTIONS:
         raise BadRequest("res debe ser 360, 480, 720, 1080 o best")
-    flag = arg("playlist", "")
-    if flag not in ("", "0", "1"):
-        raise BadRequest("playlist debe ser 0 o 1")
-    playlist = is_playlist_url(url, flag)
-    start, end = parse_time(arg("start"), "inicio"), parse_time(arg("end"), "fin")
+    return dict(kind=kind, quality=quality, fmt=fmt, res=res)
+
+
+def parse_trim(start, end):
+    start, end = parse_time(start, "inicio"), parse_time(end, "fin")
     if start is not None and end is not None and end <= start:
         raise BadRequest("El fin del recorte debe ser posterior al inicio")
     if end is not None and end <= 0:
         raise BadRequest("El fin del recorte debe ser mayor que 0")
-    if start == 0 and end is None:
+    if start == 0:
         start = None
+    return start, end
+
+
+def parse_start(arg):
+    url = arg("url")
+    check_url(url)
+    opts = parse_options(arg)
+    flag = arg("playlist", "")
+    if flag not in ("", "0", "1"):
+        raise BadRequest("playlist debe ser 0 o 1")
+    playlist = is_playlist_url(url, flag)
+    start, end = parse_trim(arg("start"), arg("end"))
     if playlist and (start is not None or end is not None):
         raise BadRequest("El recorte no está disponible para listas de reproducción")
-    return dict(url=url, kind=kind, quality=quality, fmt=fmt, res=res, playlist=playlist,
-                start=start, end=end)
+    return dict(url=url, **opts, playlist=playlist, start=start, end=end)
+
+
+def parse_queue_add(body):
+    """JSON {type, fmt, q, res, items: [{url, title, duration, start, end}]} -> elementos de la cola."""
+    try:
+        data = json.loads(body)
+    except ValueError:
+        raise BadRequest("JSON no válido") from None
+    if not isinstance(data, dict):
+        raise BadRequest("JSON no válido")
+    text = lambda v: "" if v is None else str(v).strip()  # noqa: E731
+    opts = parse_options(lambda k, d="": text(data.get(k)) or d)
+    raw = data.get("items")
+    if not isinstance(raw, list) or not raw:
+        raise BadRequest("No hay videos que añadir")
+    items = []
+    for n, it in enumerate(raw, 1):
+        try:
+            if not isinstance(it, dict):
+                raise BadRequest("formato no válido")
+            url = text(it.get("url"))
+            check_url(url)
+            start, end = parse_trim(text(it.get("start")), text(it.get("end")))
+        except BadRequest as e:
+            raise BadRequest(f"Video {n}: {e}") from None
+        dur = it.get("duration")
+        items.append(dict(
+            id=uuid.uuid4().hex, url=url, title=text(it.get("title"))[:300] or url,
+            duration=dur if isinstance(dur, (int, float)) and dur > 0 else None,
+            **opts, start=start, end=end, stage="queued", message="En cola", percent=None,
+            speed=None, eta=None, filename=None, size=None, added=time.time()))
+    return items
 
 
 def safe_name(s):
@@ -158,6 +214,104 @@ def run_job(job, p):
         job["stage_started"] = job["finished"]
         if job["stage"] != "done":
             remove_dir(job["dir"])
+
+
+def unique_path(path):
+    n, p = 2, path
+    while p.exists():
+        p = path.with_name(f"{path.stem} ({n}){path.suffix}")
+        n += 1
+    return p
+
+
+def save_queue():
+    with QUEUE_LOCK:
+        data = [{k: i.get(k) for k in QUEUE_SAVED} for i in QUEUE]
+    with SAVE_LOCK:
+        tmp = QUEUE_FILE.with_suffix(".tmp")
+        try:
+            tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(QUEUE_FILE)
+        except OSError:
+            pass
+
+
+def load_queue():
+    """Recupera la cola guardada; lo que estaba a medias vuelve a empezar."""
+    try:
+        data = json.loads(QUEUE_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    for i in data if isinstance(data, list) else []:
+        if not isinstance(i, dict) or not i.get("id") or not i.get("url"):
+            continue
+        item = {k: i.get(k) for k in QUEUE_SAVED}
+        item.update(percent=None, speed=None, eta=None)
+        if item["stage"] not in FINAL:
+            item.update(stage="queued", message="En cola")
+        QUEUE.append(item)
+
+
+def queue_worker():
+    """Procesa la cola de uno en uno y guarda cada archivo directamente en OUT_DIR."""
+    while True:
+        QUEUE_WAKE.clear()
+        with QUEUE_LOCK:
+            item = next((i for i in QUEUE if i["stage"] == "queued"), None)
+            if item:
+                item["cancel"] = threading.Event()
+                item.update(stage="starting", message="Obteniendo información del video",
+                            percent=None, speed=None, eta=None)
+        if item is None:
+            QUEUE_WAKE.wait()
+            continue
+        save_queue()
+        run_queue_item(item)
+        save_queue()
+
+
+def run_queue_item(item):
+    cancel = item["cancel"]
+
+    def update(d=None, **kw):
+        if not cancel.is_set():
+            item.update({k: v for k, v in {**(d or {}), **kw}.items() if k in QUEUE_FIELDS})
+
+    def finish(**kw):  # si se reintentó mientras se cancelaba, no pisar el nuevo estado
+        if item.get("cancel") is cancel:
+            item.update(speed=None, eta=None, **kw)
+
+    tmp = Path(tempfile.mkdtemp(prefix="ytq_"))
+    try:
+        files = download(item["url"], tmp, quality=item["quality"], kind=item["kind"],
+                         fmt=item["fmt"], res=item["res"], start=item["start"], end=item["end"],
+                         cancel=cancel, on_progress=update)
+        if cancel.is_set():
+            raise Cancelled()
+        if not files:
+            raise RuntimeError("No se generó el archivo")
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        dest = unique_path(OUT_DIR / files[0].name)
+        shutil.move(str(files[0]), dest)
+        finish(stage="done", message="Listo", filename=dest.name, size=dest.stat().st_size,
+               percent=100)
+    except Cancelled:
+        finish(stage="cancelled", message="Cancelado")
+    except BaseException as e:  # noqa: BLE001  (un fallo no detiene la cola)
+        if cancel.is_set():
+            finish(stage="cancelled", message="Cancelado")
+        else:
+            finish(stage="error", message=str(e).replace("ERROR: ", "") or type(e).__name__)
+    finally:
+        remove_dir(tmp)
+
+
+def open_folder(path):
+    path.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        os.startfile(path)  # noqa: S606
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(path)])
 
 
 def remove_dir(path):
@@ -243,6 +397,44 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(502, {"error": "No se pudo obtener la información: "
                                         + str(e).replace("ERROR: ", "")})
 
+        if u.path == "/queue":
+            with QUEUE_LOCK:
+                items = [{k: i.get(k) for k in QUEUE_FIELDS} for i in QUEUE]
+            return self._json(200, {"out_dir": str(OUT_DIR), "items": items})
+
+        if u.path in ("/queue/remove", "/queue/retry"):
+            with QUEUE_LOCK:
+                item = next((i for i in QUEUE if i["id"] == arg("id")), None)
+                if item is None:
+                    return self._json(404, {"error": "Ese video ya no está en la cola"})
+                if u.path == "/queue/retry":
+                    if item["stage"] not in ("error", "cancelled"):
+                        return self._json(409, {"error": "Solo se pueden reintentar los fallidos o cancelados"})
+                    item.pop("cancel", None)
+                    item.update(stage="queued", message="En cola", percent=None, speed=None,
+                                eta=None, filename=None, size=None)
+                elif item["stage"] in RUNNING:
+                    item["cancel"].set()
+                    item.update(stage="cancelled", message="Cancelado", speed=None, eta=None)
+                else:
+                    QUEUE.remove(item)
+            save_queue()
+            QUEUE_WAKE.set()
+            return self._json(200, {"ok": True})
+
+        if u.path == "/queue/clear":
+            with QUEUE_LOCK:
+                QUEUE[:] = [i for i in QUEUE if i["stage"] not in FINAL]
+            save_queue()
+            return self._json(200, {"ok": True})
+
+        if u.path == "/queue/open":
+            try:
+                open_folder(OUT_DIR)
+            except OSError as e:
+                return self._json(500, {"error": f"No se pudo abrir la carpeta: {e}"})
+            return self._json(200, {"ok": True})
+
         with JOBS_LOCK:
             job = JOBS.get(arg("id"))
         if u.path in ("/status", "/file", "/cancel") and not job:
@@ -289,6 +481,28 @@ class Handler(BaseHTTPRequestHandler):
 
         self._send(404, b"No encontrado")
 
+    def do_POST(self):
+        if urlparse(self.path).path != "/queue/add":
+            return self._send(404, b"No encontrado")
+        # Exigir JSON obliga a otras webs a pasar por CORS, que este servidor no permite
+        if (self.headers.get("Content-Type") or "").split(";")[0].strip() != "application/json":
+            return self._json(415, {"error": "Se esperaba JSON"})
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if not 0 < n <= MAX_BODY:
+            return self._json(413, {"error": "Petición vacía o demasiado grande"})
+        try:
+            items = parse_queue_add(self.rfile.read(n))
+        except BadRequest as e:
+            return self._json(400, {"error": str(e)})
+        with QUEUE_LOCK:
+            QUEUE.extend(items)
+        save_queue()
+        QUEUE_WAKE.set()
+        return self._json(200, {"added": len(items)})
+
     def log_message(self, *a):
         pass
 
@@ -297,7 +511,12 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Servidor web local del convertidor")
     ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", PORT)))
     ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--out", type=Path, default=Path(os.environ.get("OUT_DIR") or OUT_DIR),
+                    help="carpeta donde la cola guarda los archivos (por defecto, Descargas)")
     args = ap.parse_args()
+    OUT_DIR = args.out.expanduser().resolve()
+    load_queue()
+    threading.Thread(target=queue_worker, daemon=True).start()
     srv = ThreadingHTTPServer((HOST, args.port), Handler)
     print(f"Abierto en http://localhost:{args.port}  (Ctrl+C para salir)")
     if not args.no_browser:

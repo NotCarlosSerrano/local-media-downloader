@@ -22,7 +22,7 @@ from yt_dlp.utils import DownloadCancelled, sanitize_filename
 AUDIO_FORMATS = ("mp3", "m4a", "opus")
 QUALITIES = ("128", "192", "256", "320")
 RESOLUTIONS = ("360", "480", "720", "1080", "best")
-MAX_PLAYLIST_ITEMS = 50
+MAX_PLAYLIST_ITEMS = None  # None = sin límite
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 
 STALL_TIMEOUT = 90  # s sin que ffmpeg avance -> se aborta
@@ -129,7 +129,7 @@ def download(url, out_dir, *, quality="192", kind="audio", fmt="mp3", res="best"
     """Descarga `url` en `out_dir` y devuelve la lista de archivos finales.
 
     kind: "audio" (fmt mp3|m4a|opus, quality en kbps) o "video" (MP4 hasta `res` de alto).
-    playlist: True descarga hasta `max_items` elementos de una lista; False solo el video.
+    playlist: True descarga la lista (hasta `max_items` elementos si se indica); False solo el video.
     start/end: segundos para recortar (None = sin recorte; no se usa con listas).
     cancel: threading.Event; si se activa, se lanza `Cancelled`.
     on_progress(dict): campos de estado (stage, message, percent, speed, eta, title,
@@ -172,8 +172,10 @@ def download(url, out_dir, *, quality="192", kind="audio", fmt="mp3", res="best"
     # Lista de elementos a procesar
     if playlist:
         report(dict(stage="starting", message="Obteniendo información de la lista"))
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": "in_playlist",
-                               "noplaylist": False, "playlist_items": f"1:{max_items}"}) as y:
+        pl_opts = {"quiet": True, "no_warnings": True, "extract_flat": "in_playlist", "noplaylist": False}
+        if max_items:
+            pl_opts["playlist_items"] = f"1:{max_items}"
+        with yt_dlp.YoutubeDL(pl_opts) as y:
             pl = y.extract_info(url, download=False)
         entries = [e for e in pl.get("entries") or [] if e]
         items = [e.get("url") or e.get("webpage_url") or f"https://www.youtube.com/watch?v={e['id']}"
@@ -317,7 +319,9 @@ def _process_item(ydl, url, out_dir, work, index, kind, fmt, quality, start, end
 def get_info(url, playlist=False, max_items=MAX_PLAYLIST_ITEMS):
     """Información de un video o lista sin descargar nada (listas en modo plano, rápido)."""
     opts = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": not playlist,
-            "extract_flat": "in_playlist", "playlist_items": f"1:{max_items}" if playlist else "1"}
+            "extract_flat": "in_playlist"}
+    if not playlist or max_items:
+        opts["playlist_items"] = f"1:{max_items}" if playlist else "1"
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
 
@@ -341,7 +345,7 @@ def get_info(url, playlist=False, max_items=MAX_PLAYLIST_ITEMS):
             "thumbnail": thumb(info) or next((e["thumbnail"] for e in entries if e["thumbnail"]), None),
             "is_playlist": True,
             "count": total,
-            "download_count": min(total, max_items),
+            "download_count": min(total, max_items) if max_items else total,
             "limit": max_items,
             "entries": entries,
         }

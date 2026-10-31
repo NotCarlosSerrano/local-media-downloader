@@ -8,7 +8,8 @@ Built on [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.
 
 - **Audio**: MP3, M4A or Opus, 128–320 kbps
 - **Video**: MP4 from 360p up to 1080p / best available
-- **Playlists**: download a playlist (up to 50 items) as a ZIP
+- **Playlists**: download a whole playlist as a ZIP (no item limit)
+- **Queue**: paste several links or playlists, tick the videos you want and set a start/end for each; they download one after another, straight into your Downloads folder, even if you close the tab (pending items survive a server restart)
 - **Trim**: download only a section (e.g. `1:20` → `3:45`)
 - **Preview**: title, channel, duration and thumbnail before downloading
 - **Live progress**: percentage, speed and time remaining for both download and conversion; cancel anytime
@@ -31,7 +32,7 @@ pip install -r requirements.txt
 python server.py
 ```
 
-Then open <http://localhost:8000>. Use `--port 9000` (or `PORT=9000`) to change the port and `--no-browser` to skip opening the browser.
+Then open <http://localhost:8000>. Use `--port 9000` (or `PORT=9000`) to change the port, `--out <folder>` (or `OUT_DIR`) to change where the queue saves files, and `--no-browser` to skip opening the browser.
 
 ## How it works
 
