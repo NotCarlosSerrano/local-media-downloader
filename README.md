@@ -34,6 +34,10 @@ python server.py
 
 Then open <http://localhost:8000>. Use `--port 9000` (or `PORT=9000`) to change the port, `--out <folder>` (or `OUT_DIR`) to change where the queue saves files, and `--no-browser` to skip opening the browser.
 
+### GitHub Codespaces (when you are away from your computer)
+
+On github.com open the repo → **Code** → **Codespaces** → **Create codespace**. The app installs and starts by itself; open the **Ports** tab and click the link for port 8000 (the port is private: only your GitHub account can open it). Use the normal download button so the file goes to your device — queue downloads are saved inside the codespace in `descargas/`. Note that YouTube sometimes blocks cloud IPs ("Sign in to confirm you're not a bot"). Stop the codespace when you are done to save free hours.
+
 ## How it works
 
 ```

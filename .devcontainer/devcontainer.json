@@ -1,0 +1,11 @@
+{
+  // GitHub Codespaces: instala las dependencias y arranca la app al abrir el Codespace.
+  "name": "local-media-downloader",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "postCreateCommand": "pip install --upgrade -r requirements.txt",
+  "postAttachCommand": "pip install -q --upgrade yt-dlp && python server.py --no-browser --out descargas",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": { "label": "Descargador", "onAutoForward": "openBrowser" }
+  }
+}
