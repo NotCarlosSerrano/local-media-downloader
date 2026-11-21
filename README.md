@@ -36,7 +36,9 @@ Then open <http://localhost:8000>. Use `--port 9000` (or `PORT=9000`) to change 
 
 ### GitHub Codespaces (when you are away from your computer)
 
-On github.com open the repo → **Code** → **Codespaces** → **Create codespace**. The app installs and starts by itself; open the **Ports** tab and click the link for port 8000 (the port is private: only your GitHub account can open it). Use the normal download button so the file goes to your device — queue downloads are saved inside the codespace in `descargas/`. Note that YouTube sometimes blocks cloud IPs ("Sign in to confirm you're not a bot"). Stop the codespace when you are done to save free hours.
+On github.com open the repo → **Code** → **Codespaces** → **Create codespace**. The app installs and starts by itself; open the **Ports** tab and click the link for port 8000 (the port is private: only your GitHub account can open it). Use the normal download button so the file goes to your device — queue downloads are saved inside the codespace in `descargas/`. Stop the codespace when you are done to save free hours.
+
+**"Sign in to confirm you're not a bot"**: YouTube blocks most cloud IPs. Export your YouTube cookies to a `cookies.txt` file (Netscape format, e.g. with the *Get cookies.txt LOCALLY* extension, ideally from a secondary Google account) and drag it into the codespace's root folder, next to `server.py`. It is picked up on the next download, no restart needed, and `.gitignore` keeps it out of git. You can also point to another path with the `COOKIES` environment variable.
 
 ## How it works
 

@@ -30,3 +30,6 @@ desktop.ini
 queue.json
 queue.tmp
 descargas/
+
+# Cookies de YouTube (privadas, nunca subirlas)
+cookies.txt

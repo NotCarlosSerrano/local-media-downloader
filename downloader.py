@@ -7,6 +7,7 @@ yt-dlp solo elige formatos y descarga las pistas. La conversión, la unión de v
 y los recortes los hace ffmpeg lanzado aquí con `-progress pipe:1 -nostdin`, así cada paso
 informa de su avance, se puede cancelar y tiene un vigilante que lo corta si se atasca.
 """
+import os
 import queue
 import re
 import shutil
@@ -26,6 +27,19 @@ MAX_PLAYLIST_ITEMS = None  # None = sin límite
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 
 STALL_TIMEOUT = 90  # s sin que ffmpeg avance -> se aborta
+
+# cookies.txt (formato Netscape) junto a este archivo, o la ruta de la variable COOKIES.
+# Hace falta cuando YouTube pide "Sign in to confirm you're not a bot" (p. ej. en la nube).
+COOKIES = Path(os.environ.get("COOKIES") or Path(__file__).with_name("cookies.txt"))
+
+
+def base_opts(**extra):
+    """Opciones comunes de yt-dlp: silencioso, sin colores ANSI y con cookies si las hay."""
+    opts = {"quiet": True, "no_warnings": True, "color": {"stdout": "no_color", "stderr": "no_color"}}
+    if COOKIES.is_file():
+        opts["cookiefile"] = str(COOKIES)
+    opts.update(extra)
+    return opts
 
 
 def max_runtime(duration):
@@ -160,8 +174,7 @@ def download(url, out_dir, *, quality="192", kind="audio", fmt="mp3", res="best"
                     percent=min(pct, 100) if pct is not None else None,
                     speed=d.get("speed"), eta=d.get("eta")))
 
-    opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "progress_hooks": [hook],
-            "socket_timeout": 30, "retries": 5}
+    opts = base_opts(noplaylist=True, progress_hooks=[hook], socket_timeout=30, retries=5)
     if kind == "video":
         cap = [] if res == "best" else [f"res:{res}"]
         # Prefiere H.264 + AAC (MP4 que Windows reproduce sin códecs extra).
@@ -172,7 +185,7 @@ def download(url, out_dir, *, quality="192", kind="audio", fmt="mp3", res="best"
     # Lista de elementos a procesar
     if playlist:
         report(dict(stage="starting", message="Obteniendo información de la lista"))
-        pl_opts = {"quiet": True, "no_warnings": True, "extract_flat": "in_playlist", "noplaylist": False}
+        pl_opts = base_opts(extract_flat="in_playlist", noplaylist=False)
         if max_items:
             pl_opts["playlist_items"] = f"1:{max_items}"
         with yt_dlp.YoutubeDL(pl_opts) as y:
@@ -318,8 +331,7 @@ def _process_item(ydl, url, out_dir, work, index, kind, fmt, quality, start, end
 
 def get_info(url, playlist=False, max_items=MAX_PLAYLIST_ITEMS):
     """Información de un video o lista sin descargar nada (listas en modo plano, rápido)."""
-    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": not playlist,
-            "extract_flat": "in_playlist"}
+    opts = base_opts(skip_download=True, noplaylist=not playlist, extract_flat="in_playlist")
     if not playlist or max_items:
         opts["playlist_items"] = f"1:{max_items}" if playlist else "1"
     with yt_dlp.YoutubeDL(opts) as ydl:
