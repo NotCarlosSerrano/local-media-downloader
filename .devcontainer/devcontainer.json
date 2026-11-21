@@ -1,11 +1,18 @@
 {
   // GitHub Codespaces: instala las dependencias y arranca la app al abrir el Codespace.
+  // Incluye un escritorio con Firefox (puerto 6080, se abre desde el navegador) para iniciar
+  // sesión en YouTube; la app usa esas cookies cuando YouTube bloquea la IP de la nube.
   "name": "local-media-downloader",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
-  "postCreateCommand": "pip install --upgrade -r requirements.txt",
+  "features": {
+    "ghcr.io/devcontainers/features/desktop-lite:1": {}
+  },
+  "containerEnv": { "COOKIES_FROM_BROWSER": "firefox" },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y firefox-esr && pip install --upgrade -r requirements.txt",
   "postAttachCommand": "pip install -q --upgrade yt-dlp && python server.py --no-browser --out descargas",
-  "forwardPorts": [8000],
+  "forwardPorts": [8000, 6080],
   "portsAttributes": {
-    "8000": { "label": "Descargador", "onAutoForward": "openBrowser" }
+    "8000": { "label": "Descargador", "onAutoForward": "openBrowser" },
+    "6080": { "label": "Escritorio (Firefox)" }
   }
 }

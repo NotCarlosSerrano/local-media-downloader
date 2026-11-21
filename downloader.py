@@ -28,9 +28,19 @@ FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 
 STALL_TIMEOUT = 90  # s sin que ffmpeg avance -> se aborta
 
-# cookies.txt (formato Netscape) junto a este archivo, o la ruta de la variable COOKIES.
-# Hace falta cuando YouTube pide "Sign in to confirm you're not a bot" (p. ej. en la nube).
+# Cookies para cuando YouTube pide "Sign in to confirm you're not a bot" (p. ej. en la nube):
+# 1) cookies.txt (formato Netscape) junto a este archivo, o la ruta de la variable COOKIES;
+# 2) si no, las del navegador indicado en COOKIES_FROM_BROWSER (p. ej. "firefox"), en cuanto
+#    tenga un perfil con sesión (en Codespaces: el Firefox del escritorio remoto).
 COOKIES = Path(os.environ.get("COOKIES") or Path(__file__).with_name("cookies.txt"))
+COOKIES_FROM_BROWSER = (os.environ.get("COOKIES_FROM_BROWSER") or "").strip().lower()
+
+
+def browser_ready(name):
+    """Firefox sin perfil haría fallar a yt-dlp; los demás navegadores se pasan tal cual."""
+    if name != "firefox":
+        return True
+    return any((Path.home() / ".mozilla" / "firefox").glob("*/cookies.sqlite"))
 
 
 def base_opts(**extra):
@@ -38,6 +48,8 @@ def base_opts(**extra):
     opts = {"quiet": True, "no_warnings": True, "color": {"stdout": "no_color", "stderr": "no_color"}}
     if COOKIES.is_file():
         opts["cookiefile"] = str(COOKIES)
+    elif COOKIES_FROM_BROWSER and browser_ready(COOKIES_FROM_BROWSER):
+        opts["cookiesfrombrowser"] = (COOKIES_FROM_BROWSER,)
     opts.update(extra)
     return opts
 

@@ -38,7 +38,12 @@ Then open <http://localhost:8000>. Use `--port 9000` (or `PORT=9000`) to change 
 
 On github.com open the repo → **Code** → **Codespaces** → **Create codespace**. The app installs and starts by itself; open the **Ports** tab and click the link for port 8000 (the port is private: only your GitHub account can open it). Use the normal download button so the file goes to your device — queue downloads are saved inside the codespace in `descargas/`. Stop the codespace when you are done to save free hours.
 
-**"Sign in to confirm you're not a bot"**: YouTube blocks most cloud IPs. Export your YouTube cookies to a `cookies.txt` file (Netscape format, e.g. with the *Get cookies.txt LOCALLY* extension, ideally from a secondary Google account) and drag it into the codespace's root folder, next to `server.py`. It is picked up on the next download, no restart needed, and `.gitignore` keeps it out of git. You can also point to another path with the `COOKIES` environment variable.
+**"Sign in to confirm you're not a bot"**: YouTube blocks most cloud IPs, so the app needs YouTube cookies. Two options:
+
+- **Log in inside the codespace (works from a phone, including iPhone):** open the **Ports** tab, open port **6080** and click *Connect* (password: `vscode`). In a new VS Code terminal run `DISPLAY=:1 firefox-esr https://www.youtube.com &`, log in to YouTube in that Firefox (ideally with a secondary Google account), then **close Firefox** so the cookies are saved to disk. The app reads them automatically (`COOKIES_FROM_BROWSER=firefox`).
+- **Upload a `cookies.txt`** (Netscape format, e.g. exported with the *Get cookies.txt LOCALLY* extension) to the codespace's root folder, next to `server.py`. It takes priority over the browser cookies and `.gitignore` keeps it out of git. Another path can be set with the `COOKIES` environment variable.
+
+Delete the codespace when you no longer need it: it holds your logged-in session.
 
 ## How it works
 
